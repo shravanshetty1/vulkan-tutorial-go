@@ -90,7 +90,8 @@ func (a *App) createInstance(win *glfw.Window) error {
 
 	supportedExtensions := make(map[string]bool)
 	for _, extensionProperty := range extensionProperties {
-		supportedExtensions[string(extensionProperty.ExtensionName[:])] = true
+		extensionProperty.Deref()
+		supportedExtensions[vk.ToString(extensionProperty.ExtensionName[:])] = true
 	}
 
 	for _, glfwExtension := range glfwExtensions {
@@ -115,10 +116,13 @@ func (a *App) createInstance(win *glfw.Window) error {
 		PpEnabledExtensionNames: glfwExtensions,
 	}
 
-	res := vk.CreateInstance(&instanceCreateInfo, nil, &a.instance)
+	var instance vk.Instance
+	res := vk.CreateInstance(&instanceCreateInfo, nil, &instance)
 	if res != vk.Success {
 		return fmt.Errorf("failed to create instance")
 	}
+
+	a.instance = instance
 
 	return nil
 }
