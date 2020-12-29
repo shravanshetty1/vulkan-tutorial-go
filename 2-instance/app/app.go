@@ -83,21 +83,21 @@ func (a *App) cleanup(win *glfw.Window) {
 func (a *App) createInstance(win *glfw.Window) error {
 	glfwExtensions := win.GetRequiredInstanceExtensions()
 
-	//var extensionCount uint32
-	//vk.EnumerateInstanceExtensionProperties("", &extensionCount, nil)
-	//extensionProperties := make([]vk.ExtensionProperties, extensionCount)
-	//vk.EnumerateInstanceExtensionProperties("", &extensionCount, extensionProperties)
-	//
-	//supportedExtensions := make(map[string]bool)
-	//for _, extensionProperty := range extensionProperties {
-	//	supportedExtensions[string(extensionProperty.ExtensionName[:])] = true
-	//}
-	//
-	//for _, glfwExtension := range glfwExtensions {
-	//	if !supportedExtensions[glfwExtension] {
-	//		return fmt.Errorf("glfwExtension - " + glfwExtension + " - is not supported by vulkan")
-	//	}
-	//}
+	var extensionCount uint32
+	vk.EnumerateInstanceExtensionProperties("", &extensionCount, nil)
+	extensionProperties := make([]vk.ExtensionProperties, extensionCount)
+	vk.EnumerateInstanceExtensionProperties("", &extensionCount, extensionProperties)
+
+	supportedExtensions := make(map[string]bool)
+	for _, extensionProperty := range extensionProperties {
+		supportedExtensions[string(extensionProperty.ExtensionName[:])] = true
+	}
+
+	for _, glfwExtension := range glfwExtensions {
+		if !supportedExtensions[glfwExtension] {
+			return fmt.Errorf("glfwExtension - " + glfwExtension + " - is not supported by vulkan")
+		}
+	}
 
 	applicationInfo := vk.ApplicationInfo{
 		SType:              vk.StructureTypeApplicationInfo,
