@@ -164,27 +164,6 @@ func (a *app) pickPhysicalDevice() error {
 		return fmt.Errorf("failed to find a suitable gpu")
 	}
 
-	//supportedLayers := make(map[string]bool)
-	//for _, layerProperty := range physicalDevices {
-	//	layerProperty.Deref()
-	//	supportedLayers[vk.ToString(layerProperty.LayerName[:])] = true
-	//	layerProperty.Free()
-	//}
-	//
-	//for _, requiredLayer := range requiredLayers {
-	//	requiredLayer = strings.Map(func(r rune) rune {
-	//		if unicode.IsPrint(r) {
-	//			return r
-	//		}
-	//		return -1
-	//	}, requiredLayer)
-	//	if !supportedLayers[requiredLayer] {
-	//		return fmt.Errorf(requiredLayer + " - is not a supported layer")
-	//	}
-	//}
-	//
-	//return nil
-
 	return nil
 }
 
