@@ -93,41 +93,26 @@ func (a *app) initVulkan(win *glfw.Window) error {
 	return nil
 }
 
-func populateDebugCreateInfo(createInfo *vk.DebugReportCallbackCreateInfo) {
-	//createInfo = &vk.DebugReportCallbackCreateInfo{
-	//	SType: vk.StructureTypeDebugReportCallbackCreateInfo,
-	//	Flags: vk.DebugReportFlags(vk.DebugReportErrorBit | vk.DebugReportWarningBit),
-	//	PfnCallback: func(flags vk.DebugReportFlags, objectType vk.DebugReportObjectType, object uint64, location uint, messageCode int32, pLayerPrefix string, pMessage string, pUserData unsafe.Pointer) vk.Bool32 {
-	//		switch {
-	//		case flags&vk.DebugReportFlags(vk.DebugReportErrorBit) != 0:
-	//			log.Printf("[ERROR %d] %s on layer %s", messageCode, pMessage, pLayerPrefix)
-	//		case flags&vk.DebugReportFlags(vk.DebugReportWarningBit) != 0:
-	//			log.Printf("[WARN %d] %s on layer %s", messageCode, pMessage, pLayerPrefix)
-	//		default:
-	//			log.Printf("[WARN] unknown debug message %d (layer %s)", messageCode, pLayerPrefix)
-	//		}
-	//		return vk.Bool32(vk.False)
-	//	},
-	//}
-
-	createInfo.SType = vk.StructureTypeDebugReportCallbackCreateInfo
-	createInfo.Flags = vk.DebugReportFlags(vk.DebugReportErrorBit | vk.DebugReportWarningBit)
-	createInfo.PfnCallback = func(flags vk.DebugReportFlags, objectType vk.DebugReportObjectType, object uint64, location uint, messageCode int32, pLayerPrefix string, pMessage string, pUserData unsafe.Pointer) vk.Bool32 {
-		switch {
-		case flags&vk.DebugReportFlags(vk.DebugReportErrorBit) != 0:
-			log.Printf("[ERROR %d] %s on layer %s", messageCode, pMessage, pLayerPrefix)
-		case flags&vk.DebugReportFlags(vk.DebugReportWarningBit) != 0:
-			log.Printf("[WARN %d] %s on layer %s", messageCode, pMessage, pLayerPrefix)
-		default:
-			log.Printf("[WARN] unknown debug message %d (layer %s)", messageCode, pLayerPrefix)
-		}
-		return vk.Bool32(vk.False)
+func defaultDebugCreateInfo() vk.DebugReportCallbackCreateInfo {
+	return vk.DebugReportCallbackCreateInfo{
+		SType: vk.StructureTypeDebugReportCallbackCreateInfo,
+		Flags: vk.DebugReportFlags(vk.DebugReportErrorBit | vk.DebugReportWarningBit),
+		PfnCallback: func(flags vk.DebugReportFlags, objectType vk.DebugReportObjectType, object uint64, location uint, messageCode int32, pLayerPrefix string, pMessage string, pUserData unsafe.Pointer) vk.Bool32 {
+			switch {
+			case flags&vk.DebugReportFlags(vk.DebugReportErrorBit) != 0:
+				log.Printf("[ERROR %d] %s on layer %s", messageCode, pMessage, pLayerPrefix)
+			case flags&vk.DebugReportFlags(vk.DebugReportWarningBit) != 0:
+				log.Printf("[WARN %d] %s on layer %s", messageCode, pMessage, pLayerPrefix)
+			default:
+				log.Printf("[WARN] unknown debug message %d (layer %s)", messageCode, pLayerPrefix)
+			}
+			return vk.Bool32(vk.False)
+		},
 	}
 }
 
 func (a *app) setupDebugMessenger() error {
-	var dbgCreateInfo vk.DebugReportCallbackCreateInfo
-	populateDebugCreateInfo(&dbgCreateInfo)
+	dbgCreateInfo := defaultDebugCreateInfo()
 	var dbg vk.DebugReportCallback
 	err := vk.Error(vk.CreateDebugReportCallback(a.instance, &dbgCreateInfo, nil, &dbg))
 	if err != nil {
@@ -172,14 +157,13 @@ func (a *app) createInstance(win *glfw.Window) error {
 		ApiVersion:         vk.MakeVersion(1, 0, 0),
 	}
 
-	//var dbgCreateInfo vk.DebugReportCallbackCreateInfo
-	//populateDebugCreateInfo(&dbgCreateInfo)
+	dbgCreateInfo := defaultDebugCreateInfo()
 	instanceCreateInfo := vk.InstanceCreateInfo{
 		SType:                   vk.StructureTypeInstanceCreateInfo,
 		PApplicationInfo:        &applicationInfo,
 		EnabledExtensionCount:   uint32(len(requiredExtensions)),
 		PpEnabledExtensionNames: requiredExtensions,
-		//PNext:                   unsafe.Pointer(&dbgCreateInfo),
+		PNext:                   unsafe.Pointer(dbgCreateInfo.Ref()),
 	}
 
 	if a.config.EnableValidationLayers {
