@@ -9,12 +9,14 @@ const width = 800
 const height = 600
 
 type app struct {
+	window         *glfw.Window
 	physicalDevice vk.PhysicalDevice
 	instance       vk.Instance
 	config         AppConfig
 	debugMessenger vk.DebugReportCallback
 	logicalDevice  vk.Device
 	windowSurface  vk.Surface
+	swapChain      vk.Swapchain
 }
 
 type AppConfig struct {
@@ -30,52 +32,53 @@ func New(config AppConfig) *app {
 
 func (a *app) Run() error {
 	var err error
-
-	win, err := a.initWindow()
+	err = a.initWindow()
 	if err != nil {
 		return err
 	}
 
-	err = a.initVulkan(win)
+	err = a.initVulkan()
 	if err != nil {
 		return err
 	}
 
-	a.mainLoop(win)
-	a.cleanup(win)
+	a.mainLoop()
+	a.cleanup()
 
 	return nil
 }
 
-func (a *app) initWindow() (*glfw.Window, error) {
+func (a *app) initWindow() error {
 	err := glfw.Init()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	glfw.WindowHint(glfw.ClientAPI, glfw.NoAPI)
 	glfw.WindowHint(glfw.Resizable, glfw.False)
 	win, err := glfw.CreateWindow(width, height, "Vulkan", nil, nil)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return win, nil
+	a.window = win
 
+	return nil
 }
 
-func (a *app) mainLoop(win *glfw.Window) {
-	for !win.ShouldClose() {
+func (a *app) mainLoop() {
+	for !a.window.ShouldClose() {
 		glfw.PollEvents()
 	}
 }
-func (a *app) cleanup(win *glfw.Window) {
+func (a *app) cleanup() {
+	vk.DestroySwapchain(a.logicalDevice, a.swapChain, nil)
 	vk.DestroyDevice(a.logicalDevice, nil)
 	if a.config.EnableValidationLayers {
 		vk.DestroyDebugReportCallback(a.instance, a.debugMessenger, nil)
 	}
 	vk.DestroySurface(a.instance, a.windowSurface, nil)
 	vk.DestroyInstance(a.instance, nil)
-	win.Destroy()
+	a.window.Destroy()
 	glfw.Terminate()
 }

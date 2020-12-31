@@ -148,3 +148,35 @@ func checkDeviceExtensionsSupport(device vk.PhysicalDevice, requiredDeviceExtens
 
 	return true
 }
+
+type swapChainSupportDetails struct {
+	capabilities      vk.SurfaceCapabilities
+	surfaceFormats    []vk.SurfaceFormat
+	presentationModes []vk.PresentMode
+}
+
+func querySwapChainSupport(device vk.PhysicalDevice, surface vk.Surface) swapChainSupportDetails {
+	var details swapChainSupportDetails
+
+	vk.GetPhysicalDeviceSurfaceCapabilities(device, surface, &details.capabilities)
+	details.capabilities.Deref()
+	//details.capabilities.Free()
+
+	var formatCount uint32
+	vk.GetPhysicalDeviceSurfaceFormats(device, surface, &formatCount, nil)
+	if formatCount != 0 {
+		surfaceFormats := make([]vk.SurfaceFormat, formatCount)
+		vk.GetPhysicalDeviceSurfaceFormats(device, surface, &formatCount, surfaceFormats)
+		details.surfaceFormats = surfaceFormats
+	}
+
+	var modeCount uint32
+	vk.GetPhysicalDeviceSurfacePresentModes(device, surface, &modeCount, nil)
+	if modeCount != 0 {
+		presentationModes := make([]vk.PresentMode, modeCount)
+		vk.GetPhysicalDeviceSurfacePresentModes(device, surface, &modeCount, presentationModes)
+		details.presentationModes = presentationModes
+	}
+
+	return details
+}
