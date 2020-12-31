@@ -19,6 +19,8 @@ type app struct {
 	instance       vk.Instance
 	config         AppConfig
 	debugMessenger vk.DebugReportCallback
+	logicalDevice  vk.Device
+	windowSurface  vk.Surface
 }
 
 type AppConfig struct {
@@ -91,7 +93,17 @@ func (a *app) initVulkan(win *glfw.Window) error {
 		}
 	}
 
+	err = a.createWindowSurface(win)
+	if err != nil {
+		return err
+	}
+
 	err = a.pickPhysicalDevice()
+	if err != nil {
+		return err
+	}
+
+	err = a.createLogicalDevice()
 	if err != nil {
 		return err
 	}
@@ -99,15 +111,73 @@ func (a *app) initVulkan(win *glfw.Window) error {
 	return nil
 }
 
-func isDeviceSuitable(device vk.PhysicalDevice) bool {
+func (a *app) createWindowSurface(win *glfw.Window) error {
+
+	surfaceAddr, err := win.CreateWindowSurface(a.instance, nil)
+	if err != nil {
+		return err
+	}
+
+	a.windowSurface = vk.SurfaceFromPointer(surfaceAddr)
+
+	return nil
+}
+
+func (a *app) createLogicalDevice() error {
+	indices := findQueueFamilies(a.physicalDevice, a.windowSurface)
+
+	uniqueQueueFamily := map[uint32]bool{
+		*indices.graphicsFamily: true,
+		*indices.presentFamily:  true,
+	}
+
+	var queueCreateInfos []vk.DeviceQueueCreateInfo
+	for queueFamilyindex := range uniqueQueueFamily {
+		queueCreateInfos = append(queueCreateInfos, vk.DeviceQueueCreateInfo{
+			SType:            vk.StructureTypeDeviceQueueCreateInfo,
+			QueueFamilyIndex: queueFamilyindex,
+			QueueCount:       1,
+			PQueuePriorities: []float32{1},
+		})
+	}
+
+	//deviceFeatures := []vk.PhysicalDeviceFeatures{}
+
+	deviceCreateInfo := vk.DeviceCreateInfo{
+		SType:                vk.StructureTypeDeviceCreateInfo,
+		QueueCreateInfoCount: uint32(len(queueCreateInfos)),
+		PQueueCreateInfos:    queueCreateInfos,
+	}
+
+	if a.config.EnableValidationLayers {
+		deviceCreateInfo.EnabledLayerCount = uint32(len(a.config.ValidationLayers))
+		deviceCreateInfo.PpEnabledLayerNames = a.config.ValidationLayers
+	}
+
+	var device vk.Device
+	if vk.CreateDevice(a.physicalDevice, &deviceCreateInfo, nil, &device) != vk.Success {
+		return fmt.Errorf("could not create logical device")
+	}
+
+	a.logicalDevice = device
+
+	var graphicsQueue vk.Queue
+	vk.GetDeviceQueue(device, *indices.graphicsFamily, 0, &graphicsQueue)
+	var presentQueue vk.Queue
+	vk.GetDeviceQueue(device, *indices.presentFamily, 0, &presentQueue)
+
+	return nil
+}
+
+func isDeviceSuitable(device vk.PhysicalDevice, surface vk.Surface) bool {
 
 	var deviceProperties vk.PhysicalDeviceProperties
 	var deviceFeatures vk.PhysicalDeviceFeatures
 	vk.GetPhysicalDeviceProperties(device, &deviceProperties)
 	vk.GetPhysicalDeviceFeatures(device, &deviceFeatures)
 
-	indices := findQueueFamilies(device)
-	if indices.graphicsFamily == nil {
+	indices := findQueueFamilies(device, surface)
+	if !indices.isComplete() {
 		return false
 	}
 
@@ -116,9 +186,14 @@ func isDeviceSuitable(device vk.PhysicalDevice) bool {
 
 type queueFamilyIndices struct {
 	graphicsFamily *uint32
+	presentFamily  *uint32
 }
 
-func findQueueFamilies(device vk.PhysicalDevice) queueFamilyIndices {
+func (q *queueFamilyIndices) isComplete() bool {
+	return q.graphicsFamily != nil && q.presentFamily != nil
+}
+
+func findQueueFamilies(device vk.PhysicalDevice, surface vk.Surface) queueFamilyIndices {
 	var indices queueFamilyIndices
 
 	var propCount uint32
@@ -135,6 +210,16 @@ func findQueueFamilies(device vk.PhysicalDevice) queueFamilyIndices {
 		if (uint32(queueFlags) & uint32(vk.QueueGraphicsBit)) != 0 {
 			tmp := uint32(i)
 			indices.graphicsFamily = &tmp
+		}
+
+		var isSupported vk.Bool32
+		vk.GetPhysicalDeviceSurfaceSupport(device, uint32(i), surface, &isSupported)
+		if isSupported == vk.True {
+			tmp := uint32(i)
+			indices.presentFamily = &tmp
+		}
+
+		if indices.isComplete() {
 			break
 		}
 	}
@@ -154,7 +239,7 @@ func (a *app) pickPhysicalDevice() error {
 	vk.EnumeratePhysicalDevices(a.instance, &deviceCount, physicalDevices)
 
 	for _, physicalDevice := range physicalDevices {
-		if isDeviceSuitable(physicalDevice) {
+		if isDeviceSuitable(physicalDevice, a.windowSurface) {
 			a.physicalDevice = physicalDevice
 			break
 		}
@@ -203,9 +288,11 @@ func (a *app) mainLoop(win *glfw.Window) {
 	}
 }
 func (a *app) cleanup(win *glfw.Window) {
+	vk.DestroyDevice(a.logicalDevice, nil)
 	if a.config.EnableValidationLayers {
 		vk.DestroyDebugReportCallback(a.instance, a.debugMessenger, nil)
 	}
+	vk.DestroySurface(a.instance, a.windowSurface, nil)
 	vk.DestroyInstance(a.instance, nil)
 	win.Destroy()
 	glfw.Terminate()

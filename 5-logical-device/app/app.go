@@ -178,14 +178,14 @@ func findQueueFamilies(device vk.PhysicalDevice) queueFamilyIndices {
 	properties := make([]vk.QueueFamilyProperties, propCount)
 	vk.GetPhysicalDeviceQueueFamilyProperties(device, &propCount, properties)
 
-	for _, property := range properties {
+	for i, property := range properties {
 		property.Deref()
 		queueFlags := property.QueueFlags
 		property.Free()
 
 		if (uint32(queueFlags) & uint32(vk.QueueGraphicsBit)) != 0 {
-			var graphicsFamily uint32 = 1
-			indices.graphicsFamily = &graphicsFamily
+			tmp := uint32(i)
+			indices.graphicsFamily = &tmp
 			break
 		}
 	}
