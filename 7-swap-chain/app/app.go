@@ -9,14 +9,17 @@ const width = 800
 const height = 600
 
 type app struct {
-	window         *glfw.Window
-	physicalDevice vk.PhysicalDevice
-	instance       vk.Instance
-	config         AppConfig
-	debugMessenger vk.DebugReportCallback
-	logicalDevice  vk.Device
-	windowSurface  vk.Surface
-	swapChain      vk.Swapchain
+	window               *glfw.Window
+	physicalDevice       vk.PhysicalDevice
+	instance             vk.Instance
+	config               AppConfig
+	debugMessenger       vk.DebugReportCallback
+	logicalDevice        vk.Device
+	windowSurface        vk.Surface
+	swapChain            vk.Swapchain
+	swapChainImages      []vk.Image
+	swapChainExtent      vk.Extent2D
+	swapChainImageFormat vk.Format
 }
 
 type AppConfig struct {

@@ -58,6 +58,8 @@ func (a *app) initVulkan() error {
 
 func (a *app) createSwapChain() error {
 	swapChainSupport := querySwapChainSupport(a.physicalDevice, a.windowSurface)
+	swapChainSupport.capabilities.Deref()
+	swapChainSupport.capabilities.Free()
 
 	surfaceFormat := chooseSwapSurfaceFormat(swapChainSupport.surfaceFormats...)
 	presentationMode := chooseSwapPresentMode(swapChainSupport.presentationModes...)
@@ -81,7 +83,7 @@ func (a *app) createSwapChain() error {
 		CompositeAlpha:   vk.CompositeAlphaOpaqueBit,
 		PresentMode:      presentationMode,
 		Clipped:          vk.True,
-		OldSwapchain:     vk.Swapchain(vk.NullHandle),
+		OldSwapchain:     vk.NullSwapchain,
 	}
 
 	indices := findQueueFamilies(a.physicalDevice, a.windowSurface)
@@ -102,6 +104,14 @@ func (a *app) createSwapChain() error {
 	}
 
 	a.swapChain = swapChain
+
+	var imagesCount uint32
+	vk.GetSwapchainImages(a.logicalDevice, a.swapChain, &imagesCount, nil)
+	a.swapChainImages = make([]vk.Image, imageCount)
+	vk.GetSwapchainImages(a.logicalDevice, a.swapChain, &imagesCount, a.swapChainImages)
+
+	a.swapChainExtent = swapExtent
+	a.swapChainImageFormat = surfaceFormat.Format
 
 	return nil
 }
@@ -207,11 +217,6 @@ func (a *app) createLogicalDevice() error {
 
 	a.logicalDevice = device
 
-	var graphicsQueue vk.Queue
-	vk.GetDeviceQueue(device, *indices.graphicsFamily, 0, &graphicsQueue)
-	var presentQueue vk.Queue
-	vk.GetDeviceQueue(device, *indices.presentFamily, 0, &presentQueue)
-
 	return nil
 }
 
@@ -266,16 +271,18 @@ func chooseSwapPresentMode(presentModes ...vk.PresentMode) vk.PresentMode {
 }
 
 func chooseSwapExtent(surfaceCapabilities vk.SurfaceCapabilities, win *glfw.Window) vk.Extent2D {
+	surfaceCapabilities.Deref()
+	surfaceCapabilities.Free()
 	surfaceCapabilities.CurrentExtent.Deref()
-	surfaceCapabilities.MaxImageExtent.Deref()
-	surfaceCapabilities.MinImageExtent.Deref()
-	surfaceCapabilities.MaxImageExtent.Free()
 	surfaceCapabilities.CurrentExtent.Free()
+	surfaceCapabilities.MaxImageExtent.Deref()
+	surfaceCapabilities.MaxImageExtent.Free()
+	surfaceCapabilities.MinImageExtent.Deref()
 	surfaceCapabilities.MinImageExtent.Free()
 
-	if surfaceCapabilities.CurrentExtent.Width != vk.MaxUint32 {
-		return surfaceCapabilities.CurrentExtent
-	}
+	//if surfaceCapabilities.CurrentExtent.Width != vk.MaxUint32 {
+	//	return surfaceCapabilities.CurrentExtent
+	//}
 
 	w, h := win.GetFramebufferSize()
 

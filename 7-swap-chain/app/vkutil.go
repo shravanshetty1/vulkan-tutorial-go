@@ -141,6 +141,13 @@ func checkDeviceExtensionsSupport(device vk.PhysicalDevice, requiredDeviceExtens
 	}
 
 	for _, requiredExtension := range requiredDeviceExtensions {
+		requiredExtension = strings.Map(func(r rune) rune {
+			if unicode.IsPrint(r) {
+				return r
+			}
+			return -1
+		}, requiredExtension)
+
 		if !supportedExtensions[requiredExtension] {
 			return false
 		}
@@ -159,8 +166,6 @@ func querySwapChainSupport(device vk.PhysicalDevice, surface vk.Surface) swapCha
 	var details swapChainSupportDetails
 
 	vk.GetPhysicalDeviceSurfaceCapabilities(device, surface, &details.capabilities)
-	details.capabilities.Deref()
-	//details.capabilities.Free()
 
 	var formatCount uint32
 	vk.GetPhysicalDeviceSurfaceFormats(device, surface, &formatCount, nil)
