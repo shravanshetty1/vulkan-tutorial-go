@@ -136,6 +136,11 @@ func (a *app) createGraphicsPipeline() error {
 		return err
 	}
 
+	buf1 := make([]byte, 0, len(fragCode))
+	fragCode = append(buf1, fragCode...)
+	buf2 := make([]byte, 0, len(vertCode))
+	vertCode = append(buf2, vertCode...)
+
 	fragModule, err := a.createShaderModule(fragCode)
 	if err != nil {
 		return err
@@ -149,13 +154,13 @@ func (a *app) createGraphicsPipeline() error {
 		SType:  vk.StructureTypePipelineShaderStageCreateInfo,
 		Stage:  vk.ShaderStageVertexBit,
 		Module: vertModule,
-		PName:  "main",
+		PName:  "main\x00",
 	}
 	fragStageCreateInfo := vk.PipelineShaderStageCreateInfo{
 		SType:  vk.StructureTypePipelineShaderStageCreateInfo,
 		Stage:  vk.ShaderStageFragmentBit,
 		Module: fragModule,
-		PName:  "main",
+		PName:  "main\x00",
 	}
 
 	shaderStages := []vk.PipelineShaderStageCreateInfo{vertStageCreateInfo, fragStageCreateInfo}
@@ -299,7 +304,7 @@ func (a *app) createShaderModule(code []byte) (vk.ShaderModule, error) {
 		PNext:    nil,
 		Flags:    0,
 		CodeSize: uint(len(code)),
-		PCode:    repackUint32(code),
+		PCode:    sliceUint32(code),
 	}
 
 	var shaderModule vk.ShaderModule
@@ -311,10 +316,9 @@ func (a *app) createShaderModule(code []byte) (vk.ShaderModule, error) {
 	return shaderModule, nil
 }
 
-func repackUint32(data []byte) []uint32 {
-	buf := make([]uint32, len(data)/4)
-	vk.Memcopy(unsafe.Pointer((*sliceHeader)(unsafe.Pointer(&buf)).Data), data)
-	return buf
+func sliceUint32(data []byte) []uint32 {
+	const m = 0x7fffffff
+	return (*[m / 4]uint32)(unsafe.Pointer((*sliceHeader)(unsafe.Pointer(&data)).Data))[:len(data)/4]
 }
 
 type sliceHeader struct {
