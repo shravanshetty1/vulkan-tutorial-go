@@ -7,30 +7,34 @@ import (
 
 const width = 800
 const height = 600
+const maxFramesInFlight = 2
 
 type app struct {
-	window                  *glfw.Window
-	physicalDevice          vk.PhysicalDevice
-	instance                vk.Instance
-	config                  AppConfig
-	debugMessenger          vk.DebugReportCallback
-	logicalDevice           vk.Device
-	windowSurface           vk.Surface
-	graphicsQueue           vk.Queue
-	presentQueue            vk.Queue
-	swapChain               vk.Swapchain
-	swapChainImages         []vk.Image
-	swapChainExtent         vk.Extent2D
-	swapChainImageFormat    vk.Format
-	swapChainImageViews     []vk.ImageView
-	renderPass              vk.RenderPass
-	pipelineLayout          vk.PipelineLayout
-	graphicsPipeline        vk.Pipeline
-	swapChainFrameBuffers   []vk.Framebuffer
-	commandPool             vk.CommandPool
-	commandBuffers          []vk.CommandBuffer
-	imageAvailableSemaphore vk.Semaphore
-	renderFinishedSemaphore vk.Semaphore
+	window                   *glfw.Window
+	physicalDevice           vk.PhysicalDevice
+	instance                 vk.Instance
+	config                   AppConfig
+	debugMessenger           vk.DebugReportCallback
+	logicalDevice            vk.Device
+	windowSurface            vk.Surface
+	graphicsQueue            vk.Queue
+	presentQueue             vk.Queue
+	swapChain                vk.Swapchain
+	swapChainImages          []vk.Image
+	swapChainExtent          vk.Extent2D
+	swapChainImageFormat     vk.Format
+	swapChainImageViews      []vk.ImageView
+	renderPass               vk.RenderPass
+	pipelineLayout           vk.PipelineLayout
+	graphicsPipeline         vk.Pipeline
+	swapChainFrameBuffers    []vk.Framebuffer
+	commandPool              vk.CommandPool
+	commandBuffers           []vk.CommandBuffer
+	imageAvailableSemaphores []vk.Semaphore
+	renderFinishedSemaphores []vk.Semaphore
+	inFlightFences           []vk.Fence
+	imagesInFlight           []vk.Fence
+	currentFrame             int
 }
 
 type AppConfig struct {
@@ -99,10 +103,17 @@ func (a *app) mainLoop() error {
 
 func (a *app) drawFrame() error {
 	var imageIndex uint32
-	vk.AcquireNextImage(a.logicalDevice, a.swapChain, vk.MaxUint64, a.imageAvailableSemaphore, vk.NullFence, &imageIndex)
+	vk.WaitForFences(a.logicalDevice, 1, []vk.Fence{a.inFlightFences[a.currentFrame]}, vk.True, vk.MaxUint64)
 
-	waitsemaphores := []vk.Semaphore{a.imageAvailableSemaphore}
-	signalsemaphores := []vk.Semaphore{a.renderFinishedSemaphore}
+	vk.AcquireNextImage(a.logicalDevice, a.swapChain, vk.MaxUint64, a.imageAvailableSemaphores[a.currentFrame], vk.NullFence, &imageIndex)
+	if a.imagesInFlight[imageIndex] != vk.NullFence {
+		vk.WaitForFences(a.logicalDevice, 1, []vk.Fence{a.imagesInFlight[imageIndex]}, vk.True, vk.MaxUint64)
+	}
+
+	a.imagesInFlight[imageIndex] = a.inFlightFences[a.currentFrame]
+
+	waitsemaphores := []vk.Semaphore{a.imageAvailableSemaphores[a.currentFrame]}
+	signalsemaphores := []vk.Semaphore{a.renderFinishedSemaphores[a.currentFrame]}
 	waitStages := []vk.PipelineStageFlags{vk.PipelineStageFlags(vk.PipelineStageColorAttachmentOutputBit)}
 
 	submitInfo := []vk.SubmitInfo{{
@@ -117,7 +128,8 @@ func (a *app) drawFrame() error {
 		PSignalSemaphores:    signalsemaphores,
 	}}
 
-	err := vk.Error(vk.QueueSubmit(a.graphicsQueue, 1, submitInfo, vk.NullFence))
+	vk.ResetFences(a.logicalDevice, 1, []vk.Fence{a.inFlightFences[a.currentFrame]})
+	err := vk.Error(vk.QueueSubmit(a.graphicsQueue, 1, submitInfo, a.inFlightFences[a.currentFrame]))
 	if err != nil {
 		return err
 	}
@@ -134,13 +146,20 @@ func (a *app) drawFrame() error {
 	}
 
 	vk.QueuePresent(a.presentQueue, &presentInfo)
+	//vk.QueueWaitIdle(a.presentQueue)
+
+	a.currentFrame = (a.currentFrame + 1) % maxFramesInFlight
 
 	return nil
 }
 
 func (a *app) cleanup() {
-	vk.DestroySemaphore(a.logicalDevice, a.renderFinishedSemaphore, nil)
-	vk.DestroySemaphore(a.logicalDevice, a.imageAvailableSemaphore, nil)
+
+	for i := 0; i < maxFramesInFlight; i++ {
+		vk.DestroySemaphore(a.logicalDevice, a.renderFinishedSemaphores[i], nil)
+		vk.DestroySemaphore(a.logicalDevice, a.imageAvailableSemaphores[i], nil)
+		vk.DestroyFence(a.logicalDevice, a.inFlightFences[i], nil)
+	}
 	vk.DestroyCommandPool(a.logicalDevice, a.commandPool, nil)
 	for _, v := range a.swapChainFrameBuffers {
 		vk.DestroyFramebuffer(a.logicalDevice, v, nil)

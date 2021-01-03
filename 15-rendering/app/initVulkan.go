@@ -86,7 +86,7 @@ func (a *app) initVulkan() error {
 		return err
 	}
 
-	err = a.createSemaphores()
+	err = a.createSyncObjects()
 	if err != nil {
 		return err
 	}
@@ -94,7 +94,7 @@ func (a *app) initVulkan() error {
 	return nil
 }
 
-func (a *app) createSemaphores() error {
+func (a *app) createSyncObjects() error {
 
 	semaphoreInfo := vk.SemaphoreCreateInfo{
 		SType: vk.StructureTypeSemaphoreCreateInfo,
@@ -102,21 +102,44 @@ func (a *app) createSemaphores() error {
 		Flags: 0,
 	}
 
-	var imageAvailableSemaphore vk.Semaphore
-	err := vk.Error(vk.CreateSemaphore(a.logicalDevice, &semaphoreInfo, nil, &imageAvailableSemaphore))
-	if err != nil {
-		return err
+	fenceInfo := vk.FenceCreateInfo{
+		SType: vk.StructureTypeFenceCreateInfo,
+		PNext: nil,
+		Flags: vk.FenceCreateFlags(vk.FenceCreateSignaledBit),
 	}
 
-	a.imageAvailableSemaphore = imageAvailableSemaphore
-
-	var renderFinishedSemaphore vk.Semaphore
-	err = vk.Error(vk.CreateSemaphore(a.logicalDevice, &semaphoreInfo, nil, &renderFinishedSemaphore))
-	if err != nil {
-		return err
+	a.imageAvailableSemaphores = make([]vk.Semaphore, maxFramesInFlight)
+	a.renderFinishedSemaphores = make([]vk.Semaphore, maxFramesInFlight)
+	a.inFlightFences = make([]vk.Fence, maxFramesInFlight)
+	a.imagesInFlight = make([]vk.Fence, len(a.swapChainImages))
+	for i := range a.imagesInFlight {
+		a.imagesInFlight[i] = vk.NullFence
 	}
+	for i := 0; i < maxFramesInFlight; i++ {
+		var imageAvailableSemaphore vk.Semaphore
+		err := vk.Error(vk.CreateSemaphore(a.logicalDevice, &semaphoreInfo, nil, &imageAvailableSemaphore))
+		if err != nil {
+			return err
+		}
 
-	a.renderFinishedSemaphore = renderFinishedSemaphore
+		a.imageAvailableSemaphores[i] = imageAvailableSemaphore
+
+		var renderFinishedSemaphore vk.Semaphore
+		err = vk.Error(vk.CreateSemaphore(a.logicalDevice, &semaphoreInfo, nil, &renderFinishedSemaphore))
+		if err != nil {
+			return err
+		}
+
+		a.renderFinishedSemaphores[i] = renderFinishedSemaphore
+
+		var inFlightFence vk.Fence
+		err = vk.Error(vk.CreateFence(a.logicalDevice, &fenceInfo, nil, &inFlightFence))
+		if err != nil {
+			return err
+		}
+
+		a.inFlightFences[i] = inFlightFence
+	}
 
 	return nil
 }
